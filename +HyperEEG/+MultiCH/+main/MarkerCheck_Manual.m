@@ -1,4 +1,4 @@
-function [segmentindex,dataflag] = MarkerCheck_Manual(dataflag,markerList,savekey)
+function segmentinfo = MarkerCheck_Manual(dataflag,markerList,savekey)
 
     nfiles = length(markerList);
     segmentInterval = struct([]);

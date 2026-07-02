@@ -1,7 +1,7 @@
 function [markerList,errorFiles] = MarkerList(inputDir)
     files = HyperEEG.MultiCH.misc.getFiles(inputDir,'BDF');
     nfiles = length(files);
-    
+
     markerList = cell(nfiles,1);
     %% 逐个读取
     for i = 1 : nfiles 
