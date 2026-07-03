@@ -12,6 +12,9 @@
   - [MarkerCheck_Auto](#MarkerCheck_Auto)
   - [MarkerCheck_Manual](#MarkerCheck_Manual)
   - [segment_Marker](#segment_Marker)
+  - [PlotEEGData](#PlotEEGData)
+  - [SegmentEditor](#SegmentEditor)
+  - [DataArtifact_Manual](#DataArtifact_Manual)
 - [core](#Core)
   - [BDFreader](#BDFreader)
   - [Marker_CheckByCount](#Marker_CheckByCount)
@@ -86,6 +89,27 @@ savekey.path = filepath(以.mat结尾)
 segment_Marker(segmentinfo,outputDir)
 ```
 根据前面输入的相关信息进行切割，保存有用信息。
+
+
+### PlotEEGData
+```matlab
+PlotEEGData(EEGdata,nSeg)
+```
+绘制EEGData的线形图
+
+### SegmentEditor
+```matlab
+[outsegment, emptybool] = SegmentEditor(EEGdata,currentfilename,nSeg)
+```
+显示当前数据，手动进行坏段判别。
+
+
+### DataArtifact_Manual
+```matlab
+[outsegment, emptybool] = DataArtifact_Manual(filepath)
+```
+对输入的filepath的文件进行手动坏段去除
+
 
 ## Core
 **本部分为底层计算函数，实现单一功能，若需要进行修改，这部分是核心修改内容**

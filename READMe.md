@@ -40,6 +40,7 @@ data_ignore.xlsx文件格式如下：
 |:---:|:---:|:--:|
 | 001  |   |   |
 | 002  |   |   |
+
 其中的001；002请输入对应的需要排除的BDF名称
 如果有需要细致的marker自动筛选，如marker数大于小于某个值，可以进入core下的Marker_CheckByCount修正。
 
