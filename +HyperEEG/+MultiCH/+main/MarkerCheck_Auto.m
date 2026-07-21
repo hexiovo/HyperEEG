@@ -1,4 +1,6 @@
 function dataflag = MarkerCheck_Auto(markerList,errorFiles,DataIgnorePath)
+%MARKERCHECK_AUTO 根据读取状态、忽略表和Marker数量生成有效标记。
+%   dataflag=1表示进入人工分段，0表示当前文件跳过。
     
     nfiles = length(markerList);
     
@@ -58,7 +60,7 @@ function dataflag = MarkerCheck_Auto(markerList,errorFiles,DataIgnorePath)
         end
     end
 
-    %检查异常值
+    % 仅在当前仍有效的文件之间比较Marker数量。
     lenList = nan(nfiles,1);
     
     for i = 1:nfiles

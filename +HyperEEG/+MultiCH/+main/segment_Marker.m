@@ -1,4 +1,6 @@
 function segment_Marker(segmentinfo,outputDir)
+%SEGMENT_MARKER 根据人工确认区间切割BDF并保存_segment.mat。
+%   只处理dataflag=1的文件；每个片段保留源路径、Marker和采集元数据。
     
     fileidx = find(segmentinfo.dataflag == 1);
     nfile = numel(fileidx);
@@ -24,6 +26,7 @@ function segment_Marker(segmentinfo,outputDir)
             continue;
         end
 
+        % 每个BDF独立读取，单文件损坏不会中止其它文件。
         try
             evalc('cEEG = HyperEEG.MultiCH.core.BDFreader(filepath);');
         catch ME
@@ -81,6 +84,9 @@ function segment_Marker(segmentinfo,outputDir)
             EEGdata.marker = cintervals.intervals;
             EEGdata.times = [seperatedata.times];
             EEGdata.data  = cat(2, seperatedata.data);
+            EEGdata = HyperEEG.MultiCH.core.ProcessStatus( ...
+                EEGdata, ["bdf_import", "marker_extract", ...
+                "marker_auto", "marker_manual", "segment"], 1);
 
             if ~exist(outputDir,"dir")
                 mkdir(outputDir);

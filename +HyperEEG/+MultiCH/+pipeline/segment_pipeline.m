@@ -1,5 +1,24 @@
-function segment_pipeline(RawInputDir,outputDir,DataIgnorePath)
-    
+function segment_pipeline( ...
+        RawInputDir, outputDir, DataIgnorePath, logSwitch)
+%SEGMENT_PIPELINE 编排BDF Marker提取、筛查、人工分段和MAT导出。
+%   日志默认开启；单文件读错由下层记录并跳过，配置错误直接停止。
+
+    if nargin < 4 || isempty(logSwitch)
+        logSwitch = "on";
+    end
+
+    [logFile, logEnabled] = ...
+        HyperEEG.MultiCH.misc.InitLogFile([], "segment", logSwitch);
+
+    if logEnabled
+        diary(char(logFile));
+        diary on
+        diaryCleanup = onCleanup(@() closeDiary());
+    end
+
+    fprintf('[%s]', datestr(now,'yyyy-mm-dd HH:MM:SS'));
+    fprintf("开始数据Marker切分流程\n");
+
     if nargin < 3 || isempty(DataIgnorePath)
         DataIgnorePath = "";
     end
@@ -35,11 +54,6 @@ function segment_pipeline(RawInputDir,outputDir,DataIgnorePath)
         outputDir = outputDir + filesep;
     end
     
-    logFile = HyperEEG.MultiCH.misc.InitLogFile();
-
-    diary(logFile);
-    diary on
-
     savekey.bool = 1;
     savekey.path = outputDir + 'segmentinfo.mat';
     
@@ -62,5 +76,12 @@ function segment_pipeline(RawInputDir,outputDir,DataIgnorePath)
     clc;
     fprintf('[%s]', datestr(now,'yyyy-mm-dd HH:MM:SS'));
     fprintf("完成切分工作\n");
+
+end
+
+function closeDiary()
+%CLOSEDIARY 确保Pipeline退出时关闭日志记录。
+
+    diary off
 
 end

@@ -1,4 +1,6 @@
 function [markerList,errorFiles] = MarkerList(inputDir)
+%MARKERLIST 递归读取目录内全部BDF的Marker并汇总失败文件。
+%   markerList保留文件路径和事件，errorFiles供自动质量标记使用。
     files = HyperEEG.MultiCH.misc.getFiles(inputDir,'BDF');
     nfiles = length(files);
 

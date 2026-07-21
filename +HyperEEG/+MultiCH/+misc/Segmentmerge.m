@@ -1,4 +1,6 @@
 function segmentInterval = Segmentmerge(segmentindex)
+%SEGMENTMERGE 按名称分组并合并重叠或相接的时间区间。
+%   End="end"统一转换为Inf，输出为name/intervals标准结构。
 
     names = {segmentindex.name};
     uniqueNames = unique(names);

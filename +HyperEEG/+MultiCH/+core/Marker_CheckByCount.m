@@ -1,4 +1,6 @@
 function abnormalidx = Marker_CheckByCount(markercount)
+%MARKER_CHECKBYCOUNT 使用稳健统计查找Marker数量明显异常的文件。
+%   输入为每个文件的Marker数，输出为原序列中的异常索引。
 
     markercount = markercount(:);
     
@@ -11,6 +13,7 @@ function abnormalidx = Marker_CheckByCount(markercount)
     
     data = markercount(validIdx);
     
+    % 中位数和MAD不容易被少量损坏文件拉偏。
     medv = median(data);
     madv = median(abs(data - medv));
     

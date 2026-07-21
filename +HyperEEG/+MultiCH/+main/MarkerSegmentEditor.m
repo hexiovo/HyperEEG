@@ -1,6 +1,7 @@
 function [outmarker , emptybool] = MarkerSegmentEditor(markerdata,currentfilename)
-    % markerdata.type
-    % markerdata.latency
+%MARKERSEGMENTEDITOR 显示Marker并收集实验片段名称与边界。
+%   markerdata包含type和latency；End可填写数字或end。关闭/取消通过
+%   emptybool与正常确认区分。输入边界必须与后续EEG.times单位一致。
     
     
     outmarker = [];
@@ -68,6 +69,7 @@ function [outmarker , emptybool] = MarkerSegmentEditor(markerdata,currentfilenam
     %% =========================
     
     function addSegment(~,~)
+        % 动态增加一行Name、Start、End输入控件。
 
         segRow = segRow + 1;
         r = segRow;
@@ -123,6 +125,7 @@ function [outmarker , emptybool] = MarkerSegmentEditor(markerdata,currentfilenam
     % 8. 收集数据
     %% =========================
         function collectAndReturn()
+            % 验证每行完整性和边界顺序，再生成标准分段结构。
 
             segs = struct('name',{},'start',{},'end',{});
         
@@ -209,6 +212,7 @@ function [outmarker , emptybool] = MarkerSegmentEditor(markerdata,currentfilenam
     % 9. Cancel函数
     %% =========================
         function closeAndReturn(val)
+            % 统一返回确认结果或取消状态，并释放UI窗口。
             outmarker = val;
             emptybool = 1;
             close(fig);

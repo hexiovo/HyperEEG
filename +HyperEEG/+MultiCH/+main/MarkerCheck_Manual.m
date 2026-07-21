@@ -1,4 +1,6 @@
 function segmentinfo = MarkerCheck_Manual(dataflag,markerList,savekey)
+%MARKERCHECK_MANUAL 逐文件打开Marker编辑器并保存标准分段信息。
+%   用户取消某文件时将其dataflag设为0；savekey控制segmentinfo保存。
 
     nfiles = length(markerList);
     segmentInterval = struct([]);

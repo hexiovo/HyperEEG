@@ -1,3 +1,12 @@
 log/
-test*.m
+logs/
+*.log
 
+# Local agent/Codex configuration and instructions
+AGENT.md
+AGENTS.md
+.agent/
+.agents/
+.codex/
+
+test*.m
