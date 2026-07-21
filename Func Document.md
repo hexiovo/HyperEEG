@@ -22,6 +22,7 @@
   - [PreprocessOptions](#PreprocessOptions)
   - [DataPreprocess functions](#DataPreprocess-functions)
   - [FrequencyReviewEditor](#FrequencyReviewEditor)
+  - [QualityIndex_pipeline](#QualityIndex_pipeline)
 - [core](#Core)
   - [BDFreader](#BDFreader)
   - [Marker_CheckByCount](#Marker_CheckByCount)
@@ -209,18 +210,25 @@ options.artifact.manual.enabled = true;
 [EEGdata,info] = DataPreprocess_ArtifactAuto(EEGdata,options)
 [EEGdata,info,cancelbool] = DataPreprocess_ArtifactICAManual( ...
     EEGdata,currentfilename,options)
-[EEGdata,info,cancelbool,excludeFileBool] = ...
+[EEGdata,info,cancelbool,excludeFileBool,rerunICABool] = ...
     DataPreprocess_ArtifactManual( ...
-    EEGdata,currentfilename)
+    EEGdata,currentfilename,allowRerunICA)
 ```
-以上函数分别封装单一预处理步骤。默认自动顺序为`robust + ASR`；其后人工ICA界面逐个显示成分时间序列、成分PSD和通道权重。最后人工函数调用独立频域复核界面，显示清洗后信号的通道×频率(Hz) PSD，可标记整条坏导或排除整文件；结果写入`EEGdata.artifact.frequencyManual`。任一人工步骤取消时`cancelbool=1`。
+以上函数分别封装单一预处理步骤。默认自动顺序为`robust + ASR`；其后人工ICA界面逐个显示成分时间序列、成分PSD和通道权重。最后人工函数调用独立频域复核界面，显示清洗后信号的通道×频率(Hz) PSD，可标记整条坏导、返回上一步重新ICA或排除整文件；结果写入`EEGdata.artifact.frequencyManual`。任一人工步骤取消时`cancelbool=1`，请求重新ICA时`rerunICABool=1`。`allowRerunICA`省略时默认为`true`；Pipeline会根据人工ICA开关传入实际值。
 
 ### FrequencyReviewEditor
 ```matlab
-[reviewResult,cancelbool,excludeFileBool] = ...
-    FrequencyReviewEditor(EEGdata,currentfilename)
+[reviewResult,cancelbool,excludeFileBool,rerunICABool] = ...
+    FrequencyReviewEditor(EEGdata,currentfilename,allowRerunICA)
 ```
-用于预处理最后一步人工复核，不替代Artifact阶段的时域坏段界面。可通过上下按钮逐通道查看PSD；点击左下曲线显示最近频率点的精确Hz。支持标记整条坏导或可疑频段。新增整条坏导后，Pipeline从首次ICA前信号恢复并累计屏蔽坏导，再对剩余通道重启ICA，直到没有新增坏导；可疑频段不触发重跑。
+用于预处理最后一步人工复核，不替代Artifact阶段的时域坏段界面。可通过上下按钮逐通道查看PSD；点击左下曲线显示最近频率点的精确Hz。支持标记整条坏导或可疑频段。点击“退回上一步，重新ICA”时，本轮尚未确认的坏导和频段标记会被放弃，Pipeline恢复首次人工ICA前信号并重新打开ICA成分界面；此前已确认的坏导仍保持屏蔽。新增整条坏导后也会自动按相同基线重启ICA，直到没有新增坏导；可疑频段不触发重跑。人工ICA关闭时重新ICA按钮禁用。
+
+### QualityIndex_pipeline
+```matlab
+[qualityTable,updatedFiles] = QualityIndex_pipeline( ...
+    rawDir,segmentDir,artifactDir,cleanDir,logSwitch)
+```
+全部处理结束后扫描raw、segment、artifact和clean四个目录。存在可读取`_clean.mat`时`qualityTable.isValid=1`；否则根据最晚存在的阶段写入`数据切分阶段删除`、`坏段处理阶段删除`或`预处理阶段删除`。有效数据会调用`DataQualitySummary`，结果只写入`EEGdata.quality`：`badchannel`保存整条排除的坏导，`channelrate`为N×2 cell（左列为`ch1`等通道名，右列为0到1的数值比例），总体比例保存为`totalEffectiveRate`。`updatedFiles`返回被补写质量字段的MAT文件。Excel清单属于项目数据管理，不由包内函数写入。
 
 
 ## Core

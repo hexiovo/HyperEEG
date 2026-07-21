@@ -1,12 +1,23 @@
-function [EEGdata, info, cancelbool, excludeFileBool] = ...
-        DataPreprocess_ArtifactManual(EEGdata, currentfilename)
+function [EEGdata, info, cancelbool, excludeFileBool, rerunICABool] = ...
+        DataPreprocess_ArtifactManual( ...
+        EEGdata, currentfilename, allowRerunICA)
 %DATAPREPROCESS_ARTIFACTMANUAL 执行最终通道频域人工质量复核。
 %   界面输出通道×频率Hz的PSD；可标记整条坏导或排除整文件。
-%   时间坏段仍由前序Artifact_pipeline的时域界面负责。
+%   可请求返回上一步重新执行ICA；时间坏段仍由前序Artifact_pipeline
+%   的时域界面负责。
 
-    [reviewResult, cancelbool, excludeFileBool] = ...
+    if nargin < 3
+        allowRerunICA = true;
+    end
+
+    [reviewResult, cancelbool, excludeFileBool, rerunICABool] = ...
         HyperEEG.MultiCH.main.FrequencyReviewEditor( ...
-        EEGdata, currentfilename);
+        EEGdata, currentfilename, allowRerunICA);
+
+    if rerunICABool == 1
+        info.method = "manual_request_rerun_ica";
+        return;
+    end
 
     if cancelbool == 1
         info.method = "manual_cancelled";

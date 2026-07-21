@@ -27,3 +27,9 @@
 人工复核支持通道切换、频率定位、可疑频段记录，以及剔除坏通道后从ICA前数据重新执行ICA
 新增`EEGdata.Process`处理状态记录，并兼容坏段处理和数据切分阶段的历史数据
 统一Pipeline日志开关、日志目录和命名规则，补充示例、函数文档、README与全流程操作说明
+
+# V 0.4.2
+最终频域人工复核新增“退回上一步，重新ICA”，可放弃当前未确认标记并重新选择ICA成分
+新增`DataQualitySummary`与`QualityIndex_pipeline`，汇总数据在切分、坏段处理和预处理阶段的有效状态
+质量结果统一保存在`EEGdata.quality`，包括坏导、通道—有效比例cell和`totalEffectiveRate`
+新增合成单元测试、现有8CH数据集成测试、调用示例及对应流程文档

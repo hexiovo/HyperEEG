@@ -8,5 +8,6 @@ AGENTS.md
 .agent/
 .agents/
 .codex/
+.spreadsheet_work/
 
 test*.m

@@ -447,14 +447,35 @@ robust+ASR自动处理 -> 人工ICA -> 最终通道×频率复核。
    新增整条坏导触发；若剩余有效通道少于2个，当前文件停止并不保存。
 10. 点击左下角单通道PSD曲线或坐标区，会显示最近频率点的精确横坐标Hz，
    红色竖线和标签随点击位置更新。
-11. 可点击“整文件无效”排除当前数据；任一界面Cancel时不保存_clean.mat。
-12. 频域结果保存在EEGdata.artifact.frequencyManual，包括channel、
+11. 若发现上一轮ICA成分选择不合适，可点击“退回上一步，重新ICA”。该操作
+   会放弃本轮尚未确认的坏导和可疑频段标记，恢复首次人工ICA前的数据，保留
+   此前已经确认并累计屏蔽的坏导，然后重新打开ICA成分选择界面。人工ICA选项
+   关闭时该按钮不可用。
+12. 可点击“整文件无效”排除当前数据；任一界面Cancel时不保存_clean.mat。
+13. 频域结果保存在EEGdata.artifact.frequencyManual，包括channel、
    frequencyHz、powerDb、badChannels和flaggedBands；坏导追加到artifact.manual。
-13. 既有人工标记不会被覆盖；
+14. 既有人工标记不会被覆盖；
    ICA检查状态和删除成分序号记录在EEGdata.artifact.icaManual以及
    EEGdata.preprocessing.history中。
 
 5.9 第三阶段输出检查
+
+完成_clean.mat后运行QualityIndex_pipeline，传入raw、segment、artifact和clean
+目录。返回qualityTable；“是否有效”只有在数据保留到clean阶段时为1，否则
+为0，并在deletionReason中写明数据切分、坏段处理或预处理阶段。
+
+有效数据只在EEGdata.quality中保存以下字段：
+1. badchannel：整条被排除的通道，例如[1 3 7]；无坏导时为空数组；
+2. channelrate：N×2 cell，左列为ch1、ch2等通道名，右列为0到1的比例；
+3. totalEffectiveRate：全部通道有效时长之和/(总时长×通道数)。
+
+不要在EEGdata顶层重复保存badchannel、channelrate、channelrateText或rate，
+EEGdata.quality中也不保存channelrateText和rate。
+
+总时长按完整时间轴跨度计算，坏段删除留下的时间缺口仍位于分母中；各通道
+的NaN和Inf不计入有效时长。被整条排除的坏导显示为chN:0。运行后应检查
+项目Excel清单可单独根据qualityTable填写，不由包内代码直接修改。应检查
+Excel有效数量是否与clean目录文件数一致，并抽查badchannel和总体比例。
 
 输出名称：原文件名_clean.mat
 
