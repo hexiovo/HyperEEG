@@ -6,7 +6,8 @@ function [markerList,errorFiles] = MarkerList(inputDir)
 
     markerList = cell(nfiles,1);
     %% 逐个读取
-    for i = 1 : nfiles 
+    for i = 1 : nfiles
+        HyperEEG.MultiCH.misc.WorkflowCancel("throw");
         
         filename = files(i);   % 直接就是完整路径
     
@@ -14,12 +15,21 @@ function [markerList,errorFiles] = MarkerList(inputDir)
         fprintf('正在读取: %s\n', filename);
     
         try
-            markerList{i}.marker = HyperEEG.MultiCH.main.MarkerExtract(filename);
+            [markerList{i}.marker, markerMetadata, readSuccess] = ...
+                HyperEEG.MultiCH.main.MarkerExtract(filename);
+            markerList{i}.sampleRate = markerMetadata.sampleRate;
+            markerList{i}.firstTime_ms = markerMetadata.firstTime_ms;
+
+            if ~readSuccess
+                errorFiles{end+1,1} = filename; %#ok<AGROW>
+            end
 
         catch ME
             warning('读取失败: %s | 原因: %s', filename, ME.message);
     
             markerList{i}.marker = [];                 % 失败占位
+            markerList{i}.sampleRate = NaN;
+            markerList{i}.firstTime_ms = 0;
             errorFiles{end+1,1} = filename;     % 记录错误文件
         end
             markerList{i}.filename = filename;

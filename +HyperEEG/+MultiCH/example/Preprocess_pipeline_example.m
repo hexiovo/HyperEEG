@@ -8,6 +8,9 @@ clear all;
 % 输入目录：只读取目录及子目录中的_artifact.mat文件。
 artifactInputDir = 'I:\HyperEEG\data\脑电数据\8CH\artifact\';
 
+% 可选"auto"、"bdf"、"artifact"或"segment"；统一UI会自动设置。
+options.inputType = "artifact";
+
 % 输出目录：结果保存为_clean.mat；建议与artifact目录分开。
 cleanOutputDir = 'I:\HyperEEG\data\脑电数据\8CH\clean\';
 
@@ -142,6 +145,9 @@ options.artifact.auto.icaMaxRejectFraction = 0.25;
 % 明确知道坏成分序号时可填写，如[1,3]；[]表示自动判断。
 options.artifact.auto.icaRejectComponents = [];
 
+% 长连续记录最多用多少采样点训练自动ICA；权重仍应用于完整数据。
+options.artifact.auto.icaMaxTrainingSamples = 100000;
+
 % ASR BurstCriterion。常见值10–30；越小越严格。
 % 20是clean_rawdata常用的保守起点。ASR需要足够长的数据和
 % 相对干净的校准片段；8通道可以试用，但必须人工检查处理前后。
@@ -159,6 +165,9 @@ options.artifact.auto.asrMaxMemoryMB = 512;
 % 常规值为true/false。8通道分离证据有限，不确定的成分应保留；
 % 可以确认空选择。取消会跳过当前文件且不保存半成品。
 options.artifact.icaManual.enabled = true;
+
+% 人工ICA模型最大训练点数。默认100000可显著减少长记录等待时间。
+options.artifact.icaManual.maxTrainingSamples = 100000;
 
 %%==============================================================
 % 8. 最终人工通道频域复核

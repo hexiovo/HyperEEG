@@ -1,7 +1,13 @@
-function model = PreprocessICADecompose(data, sampleRate)
+function model = PreprocessICADecompose( ...
+        data, sampleRate, maxTrainingSamples)
 %PREPROCESSICADECOMPOSE 计算人工或自动复用的extended Infomax ICA模型。
 %   输入为通道×采样点。NaN仅在估计期间临时插值；model保留原始
-%   缺失掩码，供重建函数恢复。该函数只分解，不判定或删除成分。
+%   缺失掩码，供重建函数恢复。长记录使用均匀抽样估计ICA权重，
+%   再将权重应用到全部采样点，避免runica在数百万点上长时间无响应。
+
+    if nargin < 3 || isempty(maxTrainingSamples)
+        maxTrainingSamples = 100000;
+    end
 
     if exist('runica', 'file') ~= 2
         error("未找到EEGLAB runica，请先添加EEGLAB路径。");
@@ -9,6 +15,8 @@ function model = PreprocessICADecompose(data, sampleRate)
 
     validateattributes(sampleRate, {'numeric'}, ...
         {'scalar', 'real', 'finite', 'positive'});
+    validateattributes(maxTrainingSamples, {'numeric'}, ...
+        {'scalar', 'integer', '>=', 1000});
 
     [filledData, missingMask] = ...
         HyperEEG.MultiCH.core.PreprocessFillMissing(data);
@@ -19,9 +27,19 @@ function model = PreprocessICADecompose(data, sampleRate)
         error("ICA至少需要两个有效通道。");
     end
 
-    channelCenter = mean(usableData, 2);
+    totalSampleCount = size(usableData, 2);
+
+    if totalSampleCount > maxTrainingSamples
+        trainingIndex = unique(round(linspace( ...
+            1, totalSampleCount, maxTrainingSamples)));
+    else
+        trainingIndex = 1:totalSampleCount;
+    end
+
+    channelCenter = mean(usableData(:, trainingIndex), 2);
     centeredData = usableData - channelCenter;
-    dataRank = rank(centeredData);
+    trainingData = centeredData(:, trainingIndex);
+    dataRank = rank(trainingData * trainingData');
 
     if dataRank < 2
         error("数据秩小于2，无法执行ICA。");
@@ -34,7 +52,10 @@ function model = PreprocessICADecompose(data, sampleRate)
         runicaOptions = [runicaOptions, {'pca', dataRank}];
     end
 
-    [weights, sphere] = runica(centeredData, runicaOptions{:});
+    fprintf("ICA模型估计使用 %d/%d 个采样点（%.1f%%）。\n", ...
+        numel(trainingIndex), totalSampleCount, ...
+        numel(trainingIndex) / totalSampleCount * 100);
+    [weights, sphere] = runica(trainingData, runicaOptions{:});
     unmixingMatrix = weights * sphere;
     activation = unmixingMatrix * centeredData;
     mixingMatrix = pinv(unmixingMatrix);
@@ -56,6 +77,8 @@ function model = PreprocessICADecompose(data, sampleRate)
     model.sampleRate = sampleRate;
     model.dataRank = dataRank;
     model.componentCount = size(activation, 1);
+    model.trainingSampleCount = numel(trainingIndex);
+    model.totalSampleCount = totalSampleCount;
     model.excessKurtosis = excessKurtosis(:)';
     model.kurtosisZ = robustZ(excessKurtosis(:))';
     model.highFrequencyZ = robustZ( ...

@@ -1,13 +1,26 @@
 # Function Document
 **本说明将按章节对各部分涉及的函数进行说明。**
 
+## 顶层启动器
+```matlab
+app = HyperEEG()
+```
+类似`eeglab`的项目入口。显示单通道和多通道选项；单通道入口当前禁用并标记待开发，多通道进入`HyperEEG.MultiCH.pipeline.WorkflowUI`。
+
+无输出调用`HyperEEG`会打印名称、V0.5.4版本、版权、依赖环境和注意事项，不产生`ans`；显式调用`app = HyperEEG()`仍返回UI句柄和控件结构，便于脚本或测试控制。
+
 ## Content
 - [Pipeline](#Pipeline)
+  - [WorkflowUI](#WorkflowUI)
+  - [Workflow_pipeline](#Workflow_pipeline)
   - [segment_pipeline](#segment_pipeline)
   - [Artifact_pipeline](#Artifact_pipeline)
   - [Preprocess_pipeline](#Preprocess_pipeline)
 
 - [Main](#Main)
+  - [WorkflowOptions](#WorkflowOptions)
+  - [ArtifactOptions](#ArtifactOptions)
+  - [segment_EEGdata](#segment_EEGdata)
   - [MarkerExtract](#MarkerExtract)
   - [MarkerList](#MarkerList)
   - [MarkerSegmentEditor](#MarkerSegmentEditor)
@@ -24,6 +37,7 @@
   - [FrequencyReviewEditor](#FrequencyReviewEditor)
   - [QualityIndex_pipeline](#QualityIndex_pipeline)
 - [core](#Core)
+  - [EEGdataFromBDF](#EEGdataFromBDF)
   - [BDFreader](#BDFreader)
   - [Marker_CheckByCount](#Marker_CheckByCount)
   - [EEGdataSaver](#EEGdataSaver)
@@ -42,11 +56,42 @@
 
 ## Pipeline
 **本部分为集成函数，调用后续函数进行处理**
+
+### WorkflowUI
+```matlab
+app = HyperEEG.MultiCH.pipeline.WorkflowUI()
+```
+打开统一工作流界面。四个页签分别配置流程与路径、坏段全部参数、预处理全部参数和运行日志。底部“运行：先分段”和“运行：先预处理”是两个独立入口；“统计分析（待开发）”为禁用占位按钮。测试或嵌入调用可传入`'Visible','off'`。
+
+各配置页使用MATLAB R2023a原生可滚动的`uigridlayout`，按固定行高完整呈现参数并随窗口宽度伸缩。运行中点击关闭会弹出取消确认；确认后通过`WorkflowCancel`向各Pipeline发送协作式取消请求，关闭当前人工复核窗口并保留主UI。
+
+底部“打开操作说明”按钮使用项目根目录解析并通过系统PDF阅读器打开`output/pdf/HyperEEG全流程操作说明.pdf`。运行异常会将`getReport`完整堆栈写入界面日志，而不只显示一行错误消息。
+
+### Workflow_pipeline
+```matlab
+results = Workflow_pipeline(config,order,progressCallback)
+```
+不依赖UI的工作流编排入口。`order`取`"segment_first"`或`"preprocess_first"`。前者兼容原顺序；后者先在连续BDF上执行坏段和预处理，再调用`segment_EEGdata`切割清洗后的连续MAT，从而避免每个小段重复人工ICA。`config`由`WorkflowOptions`补齐和验证，第三参数可选，用于接收阶段进度文本。
+
 ### segment_pipeline
 ```matlab
-segment_pipeline(RawInputDir,outputDir,DataIgnorePath,logSwitch)
+segmentinfo = segment_pipeline( ...
+    RawInputDir,outputDir,DataIgnorePath,logSwitch, ...
+    SegmentPlanPath,executeSegment)
 ```
 完成从数据输入到根据marker分割的全过程。其中：
+
+`SegmentPlanPath`为可选的`.xlsx`批量分段计划。`executeSegment`默认为`true`；设为`false`时只生成并保存`segmentinfo`，供“先预处理”流程最后切割清洗数据。填写XLSX后跳过逐文件人工输入，并且不再使用“不同文件Marker数量离群”排除文件；读取失败和`DataIgnorePath`仍然生效。留空或省略时保持原交互流程。XLSX优先读取`segments`工作表，否则读取第一个工作表；每行表示一个区间，必需列如下：
+
+| 列 | 含义 |
+|---|---|
+| `file_name` | BDF文件名、相对路径或完整路径；仅写文件名时必须唯一 |
+| `segment_name` | 输出分段名；同名多行表示同一分段的多个区间 |
+| `start` | 区间开始位置 |
+| `end` | 区间结束位置，也可填`end`表示数据末尾 |
+| `unit` | `time_ms`、`time_s`或`sample_index`，不得省略 |
+
+可选列`enabled`填写1/0、true/false或是/否；禁用行不导入。`notes`可用于人工备注但不参与计算。导入后所有边界统一转换为相对EEG时间轴的`time_ms`并写入`segmentinfo.source`追溯来源。
 ```matlab
 RawInputDir:原始BDF文件存储地址
 outputDir:目标输入地址，不能与上述等同
@@ -64,7 +109,7 @@ data_ignore.xlsx文件格式如下：
 [outputFiles,excludedFiles] = Artifact_pipeline( ...
     inputDir,outputDir,autoOptions,logSwitch)
 ```
-读取`inputDir`及其子目录中的`_segment.mat`文件，依次完成自动坏段识别、人工坏段复核、统一切割与MAT保存。`autoOptions`为可选的自动识别参数结构体，省略时使用默认参数。`logSwitch`为可选日志开关，可填写`"on"`或`"off"`，默认值为`"on"`。`outputFiles`返回成功生成的文件，`excludedFiles`返回人工判定整文件无效的输入文件。
+读取`inputDir`及其子目录中的原始BDF或`_segment.mat`，依次完成自动坏段识别、人工坏段复核、统一切割与MAT保存。`autoOptions.inputType`可为`"auto"`、`"bdf"`或`"segment"`；`autoOptions.auto.enabled`、`manual.enabled`和`apply.enabled`分别控制自动检测、人工复核和实际应用标记。其余窗口检测参数统一由`ArtifactOptions`补齐。`logSwitch`可为`"on"`或`"off"`。`outputFiles`返回成功生成的文件，`excludedFiles`返回人工判定整文件无效的输入文件。
 
 自动和人工函数只返回标记，不直接修改数据。Pipeline将标记分别写入`EEGdata.artifact.auto`和`EEGdata.artifact.manual`，再统一调用`DataArtifact_segment`处理。`channel = 0`表示删除所有通道共同的坏时间列；`channel > 0`只将指定通道对应区间设为`NaN`。输出文件保存在`outputDir`，文件名末尾由`_segment.mat`改为`_artifact.mat`。处理日志与`segment_pipeline`统一保存在当前工作目录的`log`文件夹，文件名格式为`时间_artifact.txt`。用户取消人工复核时跳过当前文件且不保存。
 
@@ -72,16 +117,30 @@ data_ignore.xlsx文件格式如下：
 ```matlab
 outputFiles = Preprocess_pipeline(inputDir,outputDir,options,logSwitch)
 ```
-读取`inputDir`及其子目录中的`_artifact.mat`文件，按顺序执行可选重采样、去趋势、带通滤波、工频滤波、重参考和伪迹处理。每一步均由`main`层独立函数封装，核心计算位于`core`层。输出保存在`outputDir`，文件名末尾由`_artifact.mat`改为`_clean.mat`，成功保存的完整路径由`outputFiles`返回。
+读取`inputDir`及其子目录中的BDF、`_segment.mat`或`_artifact.mat`，按顺序执行可选重采样、去趋势、带通滤波、工频滤波、重参考和伪迹处理。`options.inputType`可为`"auto"`、`"bdf"`、`"segment"`或`"artifact"`。每一步均由`main`层独立函数封装，核心计算位于`core`层。输出保存在`outputDir`并以`_clean.mat`结尾，成功保存的完整路径由`outputFiles`返回。
 
 `logSwitch`默认值为`"on"`，日志保存在当前工作目录的`log`文件夹，名称格式为`时间_preprocess.txt`。每一步的参数、执行时间、输入/输出样本数和MATLAB版本写入`EEGdata.preprocessing.history`；当前采样率写入`EEGdata.etc.samplerate.clean`，输出路径写入`EEGdata.file.cleanpath`。
 
 默认参数为不重采样、不重参考、线性去趋势、0.5–80 Hz带通、50 Hz Notch、按顺序执行`robust + ASR`、人工ICA成分选择和最终通道频域复核。最终复核显示通道×频率(Hz) PSD，不生成时频图；可以标记整条坏导或排除整文件。
 
+人工和自动ICA分别通过`artifact.icaManual.maxTrainingSamples`与`artifact.auto.icaMaxTrainingSamples`限制模型训练点数，默认100000。长记录均匀抽样估计ICA权重，再把权重应用于完整连续数据；不会截短最终信号。
+
 
 
 ## Main
 **本部分为数据处理的封装函数，用于调用算法以及各种子集函数，实现单一功能**
+
+### WorkflowOptions
+递归补齐统一UI和`Workflow_pipeline`配置，验证阶段开关、日志开关，并分别调用`ArtifactOptions`和`PreprocessOptions`完成子配置校验。
+
+### ArtifactOptions
+集中定义`Artifact_pipeline`的输入类型、自动/人工/应用三个开关及全部滑窗坏段检测参数；错误参数会在批处理读取文件前终止。
+
+### segment_EEGdata
+```matlab
+outputFiles = segment_EEGdata(segmentinfo,inputDir,outputDir)
+```
+按`time_ms`分段计划切割连续`_artifact.mat`或`_clean.mat`，保留已有预处理数据、处理历史和状态，输出`_artifact_segment.mat`或`_clean_segment.mat`。用于连续优先流程，不重新运行坏段、ASR或ICA。
 ### MarkerExtract
 ```matlab
 marker = MarkerExtract(filename)
@@ -232,6 +291,12 @@ options.artifact.manual.enabled = true;
 
 
 ## Core
+
+### EEGdataFromBDF
+```matlab
+EEGdata = EEGdataFromBDF(filepath)
+```
+把单份BDF读取为连续`EEGdata`，不做信号修改和分段；保留原始路径、事件样本索引，并新增显式`time_ms`。供坏段和预处理Pipeline直接接受BDF时复用。
 **本部分为底层计算函数，实现单一功能，若需要进行修改，这部分是核心修改内容**
 ### BDFreader
 ```matlab
@@ -259,7 +324,7 @@ EEGdata = EEGdataSaver(EEGdata,BDFdata)
 EEGdata = ProcessStatus(EEGdata)
 EEGdata = ProcessStatus(EEGdata,processName,processValue)
 ```
-集中维护`EEGdata.Process`。无步骤参数时补齐全部已知字段并将缺失字段初始化为0；指定步骤后写入0或1。Pipeline只在操作真正成功后写1，关闭、跳过、取消和异常保持0。状态覆盖BDF读取、Marker提取与复核、分段、坏段自动/人工处理、重采样、去趋势、带通、Notch、重参考、robust、ASR、自动/人工ICA、最终人工复核和预处理完成。`ica`是所有ICA操作的汇总状态，`ica_auto`和`ica_manual`用于区分方式；ASR字段使用标准拼写`asr`。
+集中维护`EEGdata.Process`。无步骤参数时补齐全部已知字段并将缺失字段初始化为0；指定步骤后写入0或1。Pipeline只在操作真正成功后写1，关闭、跳过、取消和异常保持0。状态覆盖BDF读取、Marker提取与复核、XLSX Marker导入、分段、坏段自动/人工处理、重采样、去趋势、带通、Notch、重参考、robust、ASR、自动/人工ICA、最终人工复核和预处理完成。人工录入成功写`marker_manual=1`；XLSX导入成功写`marker_import=1`。`ica`是所有ICA操作的汇总状态，`ica_auto`和`ica_manual`用于区分方式；ASR字段使用标准拼写`asr`。
 
 ### ArtifactDetectByWindow
 ```matlab

@@ -6,11 +6,25 @@ function filePaths = getFiles(rootPath, ext)
 % 输出:
 %   filePaths : string数组，每个元素为完整路径
 
-    if ext(1) ~= '.'
-        ext = ['.' ext];
+    rootPath = string(rootPath);
+    ext = string(ext);
+
+    if ~isscalar(rootPath) || strlength(rootPath) == 0
+        error("rootPath必须为非空文本标量。");
     end
 
-    files = dir(fullfile(rootPath, '**', ['*' ext]));
+    if ~isscalar(ext) || strlength(ext) == 0
+        error("ext必须为非空文本标量。");
+    end
+
+    if ~startsWith(ext, ".")
+        ext = "." + ext;
+    end
+
+    searchPattern = fullfile(rootPath, "**", "*" + ext);
+    % MATLAB R2023a的dir在部分环境中不接受由混合文本拼接产生的
+    % string数组；边界统一转为char标量。
+    files = dir(char(searchPattern));
 
     filePaths = strings(length(files), 1);
 

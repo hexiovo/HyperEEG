@@ -101,7 +101,7 @@ function [outputData, info] = icaRepair(data, sampleRate, options)
 %   低通道数据的可分离成分有限，结果必须结合人工波形检查。
 
     model = HyperEEG.MultiCH.core.PreprocessICADecompose( ...
-        data, sampleRate);
+        data, sampleRate, options.icaMaxTrainingSamples);
     kurtosisZ = model.kurtosisZ(:);
     highFrequencyZ = model.highFrequencyZ(:);
 
