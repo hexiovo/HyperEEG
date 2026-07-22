@@ -104,8 +104,8 @@ function varargout = HyperEEG(varargin)
     function printIntroduction()
         fprintf('\n============================================================\n');
         fprintf('名称为：HyperEEG 多人脑电标准处理平台\n');
-        fprintf('版本为：V0.5.4\n');
-        fprintf('版权为：© 2026 HyperEEG 项目（作者：hexi；维护联系：彭洋）\n');
+        fprintf('版本为：V0.5.5\n');
+        fprintf('版权为：© 2026 HyperEEG 项目（作者：hexi；维护联系：@github.com/hexiovo）\n');
         fprintf('适用环境为：MATLAB R2023a，EEGLAB + BIOSIG；ASR需clean_rawdata。\n');
         fprintf('注意事项为：\n');
         fprintf('  1. 原始BDF只读，各处理阶段请使用不同输出目录。\n');

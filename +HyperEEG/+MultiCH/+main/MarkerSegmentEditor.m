@@ -2,8 +2,8 @@ function [outmarker , emptybool] = MarkerSegmentEditor(markerdata,currentfilenam
 %MARKERSEGMENTEDITOR 显示Marker并收集实验片段名称与边界。
 %   markerdata包含type、sample_index和time_ms；Start/End统一填写time_ms，
 %   End也可填写end。关闭/取消通过emptybool与正常确认区分。
-    
-    
+
+
     outmarker = [];
     emptybool = 0;
     
@@ -23,19 +23,29 @@ function [outmarker , emptybool] = MarkerSegmentEditor(markerdata,currentfilenam
     % 2. 上方：marker显示（可滚动）
     %% =========================
     topPanel = uipanel(mainLayout,'Title','Markers');
-    topScroll = uigridlayout(topPanel,[1 1]);
-    
-    txt = "";
-    txt = "Type\tSample index\tTime (ms)" + newline;
-    for i = 1:length(markerdata.type)
-        txt = txt + sprintf('%s\t%.6g\t%.6f\n', ...
-            string(markerdata.type{i}), markerdata.sample_index{i}, ...
-            markerdata.time_ms{i});
+    topScroll = uigridlayout(topPanel,[2 1]);
+    topScroll.RowHeight = {24, '1x'};
+
+    uilabel(topScroll, ...
+        'Text', 'Sample index 与 Time (ms) 均完整显示；Time (ms) 四舍五入为整数。', ...
+        'FontWeight', 'bold');
+
+    % uitable在列宽较窄时可能再次以科学计数法渲染数值，因此这里把三列
+    % 预先格式化为纯文本。Consolas仅用于视觉对齐，不改变下游保存的值。
+    txt = string(sprintf('Type\tSample index\tTime (ms)\n'));
+    for imarker = 1:length(markerdata.type)
+        % %.0f保证完整十进制整数且不出现e+06；显示层按需求四舍五入，
+        % 原始双精度time_ms仍保留在markerdata中供后续边界换算使用。
+        txt = txt + sprintf('%s\t%.0f\t%.0f\n', ...
+            string(markerdata.type{imarker}), ...
+            markerdata.sample_index{imarker}, ...
+            markerdata.time_ms{imarker});
     end
-    
-    ta = uitextarea(topScroll, ...
+
+    uitextarea(topScroll, ...
         'Value', cellstr(txt), ...
-        'Editable','off');
+        'Editable','off', ...
+        'FontName', 'Consolas');
     
     %% =========================
     % 3. 下方：分段编辑区（修正版）
@@ -52,7 +62,7 @@ function [outmarker , emptybool] = MarkerSegmentEditor(markerdata,currentfilenam
    segScrollPanel = uipanel(bottomLayout);
     segScrollPanel.Scrollable = 'on';
     
-    % ⭐ 新增：内容容器（关键）
+    % 滚动面板本身不会随动态控件扩展，因此使用独立内容容器承载输入行。
     contentPanel = uipanel(segScrollPanel);
     contentPanel.Position = [0 0 740 2000]; % 给一个"足够大"的初始值
     
@@ -78,7 +88,7 @@ function [outmarker , emptybool] = MarkerSegmentEditor(markerdata,currentfilenam
         segRow = segRow + 1;
         r = segRow;
     
-        % ===== 关键修复：真正扩展 RowHeight =====
+        % 每添加一行必须同步扩展RowHeight，否则控件会落在同一网格行并重叠。
         segLayout.RowHeight = [segLayout.RowHeight, {30}];
     
         nameBox  = uieditfield(segLayout,'text','Placeholder','Name');
@@ -133,14 +143,15 @@ function [outmarker , emptybool] = MarkerSegmentEditor(markerdata,currentfilenam
 
             segs = struct('name',{},'start',{},'end',{});
         
-            for i = 1:length(segData)
-        
-                nameVal  = strtrim(segData{i}.name.Value);
-                startVal = strtrim(segData{i}.start.Value);
-                endVal   = strtrim(segData{i}.end.Value);
+            for isegment = 1:length(segData)
+
+                nameVal  = strtrim(segData{isegment}.name.Value);
+                startVal = strtrim(segData{isegment}.start.Value);
+                endVal   = strtrim(segData{isegment}.end.Value);
         
                 % ==============================
                 % 1. 完全空行 → 跳过
+                % 预留空行用于继续添加分段，不能误判为取消或格式错误。
                 % ==============================
                 if isempty(nameVal) && isempty(startVal) && isempty(endVal)
                     continue;
@@ -148,30 +159,33 @@ function [outmarker , emptybool] = MarkerSegmentEditor(markerdata,currentfilenam
         
                 % ==============================
                 % 2. 部分空 → 阻止
+                % 名称、起点和终点共同组成一条原子记录，不静默补默认值。
                 % ==============================
                 if isempty(nameVal) || isempty(startVal) || isempty(endVal)
         
                     uialert(fig, ...
-                        sprintf('第 %d 行存在空白字段，请补全后再提交。', i), ...
+                        sprintf('第 %d 行存在空白字段，请补全后再提交。', isegment), ...
                         '输入错误');
                     return;
                 end
         
                 % ==============================
                 % 3. start 必须为数字
+                % UI约定统一为time_ms，避免把sample_index直接混入同一比较。
                 % ==============================
                 startNum = str2double(startVal);
         
                 if isnan(startNum)
         
                     uialert(fig, ...
-                        sprintf('第 %d 行 Start 不是有效数字。', i), ...
+                        sprintf('第 %d 行 Start 不是有效数字。', isegment), ...
                         '输入错误');
                     return;
                 end
         
                 % ==============================
                 % 4. end 必须是数字 或 "end"
+                % inf只是内部哨兵，下游会依据当前文件真实末尾完成裁剪。
                 % ==============================
                 if strcmpi(endVal, 'end')
                     endNum = inf;
@@ -180,7 +194,7 @@ function [outmarker , emptybool] = MarkerSegmentEditor(markerdata,currentfilenam
         
                     if isnan(endNum)
                         uialert(fig, ...
-                            sprintf('第 %d 行 End 不是数字或 "end"。', i), ...
+                            sprintf('第 %d 行 End 不是数字或 "end"。', isegment), ...
                             '输入错误');
                         return;
                     end
@@ -188,11 +202,12 @@ function [outmarker , emptybool] = MarkerSegmentEditor(markerdata,currentfilenam
         
                 % ==============================
                 % 5. 逻辑校验：end > start
+                % 严格大于可同时排除零长度片段和方向颠倒的输入。
                 % ==============================
                 if endNum <= startNum
         
                     uialert(fig, ...
-                        sprintf('第 %d 行 End 必须大于 Start。', i), ...
+                        sprintf('第 %d 行 End 必须大于 Start。', isegment), ...
                         '输入错误');
                     return;
                 end

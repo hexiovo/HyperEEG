@@ -7,7 +7,7 @@ app = HyperEEG()
 ```
 类似`eeglab`的项目入口。显示单通道和多通道选项；单通道入口当前禁用并标记待开发，多通道进入`HyperEEG.MultiCH.pipeline.WorkflowUI`。
 
-无输出调用`HyperEEG`会打印名称、V0.5.4版本、版权、依赖环境和注意事项，不产生`ans`；显式调用`app = HyperEEG()`仍返回UI句柄和控件结构，便于脚本或测试控制。
+无输出调用`HyperEEG`会打印名称、V0.5.5版本、版权、依赖环境和注意事项，不产生`ans`；显式调用`app = HyperEEG()`仍返回UI句柄和控件结构，便于脚本或测试控制。
 
 ## Content
 - [Pipeline](#Pipeline)
@@ -65,7 +65,7 @@ app = HyperEEG.MultiCH.pipeline.WorkflowUI()
 
 各配置页使用MATLAB R2023a原生可滚动的`uigridlayout`，按固定行高完整呈现参数并随窗口宽度伸缩。运行中点击关闭会弹出取消确认；确认后通过`WorkflowCancel`向各Pipeline发送协作式取消请求，关闭当前人工复核窗口并保留主UI。
 
-底部“打开操作说明”按钮使用项目根目录解析并通过系统PDF阅读器打开`output/pdf/HyperEEG全流程操作说明.pdf`。运行异常会将`getReport`完整堆栈写入界面日志，而不只显示一行错误消息。
+底部“打开操作说明”按钮使用项目根目录解析并通过系统PDF阅读器打开`txt/HyperEEG全流程操作说明.pdf`。运行异常会将`getReport`完整堆栈写入界面日志，而不只显示一行错误消息。
 
 ### Workflow_pipeline
 ```matlab
@@ -157,7 +157,7 @@ marker = MarkerExtract(filename)
 ```matlab
 [outmarker , emptybool] = MarkerSegmentEditor(markerdata)
 ```
-传入格式为带有type和latency的mark列，弹出提示框，键入对应的分段以及名称，返回键入列以及是否取消，取消赋值emptybool = 1
+传入包含`type`、`sample_index`和`time_ms`的Marker列，弹出分段编辑界面。Sample index和Time (ms)均按完整整数显示，不使用科学计数法；毫秒四舍五入且不保留小数。Start和End统一填写time_ms。返回人工分段及是否取消，取消时`emptybool = 1`。
 
 ### MarkerCheck_Auto
 ```matlab

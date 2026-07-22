@@ -5,7 +5,7 @@ authority：[hexi](https://github.com/hexiovo)
 
 email：[彭洋](mailto:py_edu_mail@163.com)
 
-完整的逐步运行方法、人工界面判断准则和输出验收清单见`output/pdf/HyperEEG全流程操作说明.pdf`；PDF提供可点击目录和书签。
+完整的逐步运行方法、人工界面判断准则和输出验收清单见`txt/HyperEEG全流程操作说明.pdf`；PDF提供可点击目录、书签和实际操作界面截图。
 
 # 统一工作流界面
 
@@ -35,7 +35,7 @@ app = HyperEEG.MultiCH.pipeline.WorkflowUI();
 
 流程与路径、坏段参数、信号步骤、自动伪迹、人工复核和运行日志页面均使用独立垂直滚动区，窗口缩小时不会截断下方参数。任务运行期间点击主界面的“关闭”或右上角关闭键，会先询问是否取消；确认后协作式停止当前任务并保留界面与已填写参数，不会直接关闭UI。
 
-多通道主界面底部的“打开操作说明”可直接打开`output/pdf/HyperEEG全流程操作说明.pdf`。V0.5.3同时修复了先预处理流程在最终分段时将`string`路径错误传入`dir`的问题，并兼容空的忽略名单路径；V0.5.4将原TXT重排为带可点击目录、PDF书签和重点提示框的正式操作手册。
+多通道主界面底部的“打开操作说明”可直接打开`txt/HyperEEG全流程操作说明.pdf`。V0.5.3同时修复了先预处理流程在最终分段时将`string`路径错误传入`dir`的问题，并兼容空的忽略名单路径；V0.5.4将原TXT重排为正式PDF手册；V0.5.5补充实际操作界面截图，并统一Marker整数显示。
 
 # 0 Prepare
 
@@ -86,7 +86,7 @@ data_ignore.xlsx文件格式如下：
 对有效数据进行逐一marker输入，在这一步中，会弹出弹窗（如果提示：无法对xxx数据进行.的处理方式等报错，请重启matlab，这是由于matlab缓冲导致的。）
 弹窗中，上方显示所有在实验中打出的marker的时间点以及所标记的类型，请根据你们的实验要求进行数据拆分。
 
-Marker界面同时显示`Sample index`和`Time (ms)`；Start、End统一填写`Time (ms)`，不能直接把样本索引当作毫秒使用。
+Marker界面同时以完整整数显示`Sample index`和`Time (ms)`，不会使用科学计数法；毫秒四舍五入且不保留小数。Start、End统一填写`Time (ms)`，不能直接把样本索引当作毫秒使用。
 
 文件较多时可在`segment_pipeline`第5参数传入XLSX，跳过逐文件手工输入。XLSX每行表示一个区间，必需列为`file_name`、`segment_name`、`start`、`end`、`unit`。`unit`必须明确写`time_ms`、`time_s`或`sample_index`；同一文件、同一分段可以写多行。可选`enabled`列用于临时关闭某行。XLSX模式不会再按跨文件Marker数量离群值排除文件，但读取失败和忽略名单仍然生效。
 
