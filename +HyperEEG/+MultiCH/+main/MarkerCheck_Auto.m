@@ -1,4 +1,5 @@
-function dataflag = MarkerCheck_Auto(markerList,errorFiles,DataIgnorePath)
+function dataflag = MarkerCheck_Auto( ...
+        markerList, errorFiles, DataIgnorePath, compareMarkerCount)
 %MARKERCHECK_AUTO 根据读取状态、忽略表和Marker数量生成有效标记。
 %   dataflag=1表示进入人工分段，0表示当前文件跳过。
     
@@ -6,6 +7,10 @@ function dataflag = MarkerCheck_Auto(markerList,errorFiles,DataIgnorePath)
     
     if nargin < 3 || isempty(DataIgnorePath)
         DataIgnorePath = '';
+    end
+
+    if nargin < 4 || isempty(compareMarkerCount)
+        compareMarkerCount = true;
     end
     
     %设置返回数据
@@ -30,7 +35,13 @@ function dataflag = MarkerCheck_Auto(markerList,errorFiles,DataIgnorePath)
     
     if exist(DataIgnorePath, 'file') == 2 && ~isempty(DataIgnorePath)
 
-        [~,~,dataIgnoreName] = xlsread(DataIgnorePath);
+        % readcell不依赖Excel/COM；临时清理第三方工具箱对MATLAB内置
+        % 字符串函数的覆盖，读取完成后立即恢复原路径。
+        pathCleanup = ...
+            HyperEEG.MultiCH.misc.TemporarilyRemoveBuiltinShadows( ...
+            "读取忽略名单");
+        dataIgnoreName = readcell(char(DataIgnorePath), 'Sheet', 1);
+        clear pathCleanup
     
         if ~isempty(dataIgnoreName) && size(dataIgnoreName,1) > 1
     
@@ -69,7 +80,11 @@ function dataflag = MarkerCheck_Auto(markerList,errorFiles,DataIgnorePath)
         end
     end
     
-    abnormalidx = HyperEEG.MultiCH.core.Marker_CheckByCount(lenList);
+    abnormalidx = [];
+
+    if compareMarkerCount
+        abnormalidx = HyperEEG.MultiCH.core.Marker_CheckByCount(lenList);
+    end
 
     if ~isempty(abnormalidx)
         dataflag(abnormalidx) = 0;

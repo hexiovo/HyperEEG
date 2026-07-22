@@ -5,7 +5,37 @@ authority：[hexi](https://github.com/hexiovo)
 
 email：[彭洋](mailto:py_edu_mail@163.com)
 
-完整的逐步运行方法、人工界面判断准则和输出验收清单见`HyperEEG全流程操作说明.txt`。
+完整的逐步运行方法、人工界面判断准则和输出验收清单见`output/pdf/HyperEEG全流程操作说明.pdf`；PDF提供可点击目录和书签。
+
+# 统一工作流界面
+
+推荐从项目根目录直接运行：
+
+```matlab
+HyperEEG
+```
+
+启动窗口提供“单通道”和“多通道”两个入口；单通道当前灰显待开发，点击多通道进入完整工作流。也可跳过启动窗口直接运行：
+
+直接输入`HyperEEG`时，命令行会显示平台名称、版本、版权、运行环境和注意事项，不再生成或显示`ans`结构体。如需在脚本中控制启动窗口，仍可显式接收返回值：`app = HyperEEG();`。
+
+```matlab
+app = HyperEEG.MultiCH.pipeline.WorkflowUI();
+```
+
+界面包含“流程与路径”“坏段参数”“预处理参数”“运行日志”四页，所有正式步骤都有启用开关，坏段检测和预处理的全部现有参数均可配置。底部提供两个独立入口：
+
+- `运行：先分段`：BDF → `_segment.mat` → `_artifact.mat` → `_clean.mat`，兼容原流程，但每个片段可能分别进行人工ICA；
+- `运行：先预处理`：连续BDF → `_artifact.mat` → `_clean.mat` → 最终`_clean_segment.mat`。ICA在每份长连续记录上执行一次，再按Marker计划切段，通常更适合当前问题；
+- `统计分析（待开发）`：已预留并禁用，当前版本不会执行未定义的统计方法。
+
+原始BDF始终只读，各阶段必须使用不同输出目录。可继续传入示例中的`segment_plan_example.xlsx`与`data_ignore_example.xlsx`。
+
+人工坏段复核没有新增标记时，保持表格为空并点击“确认（可无新增坏段）”；关闭窗口或点击取消表示跳过当前文件。连续人工ICA默认最多均匀选取100000个采样点估计权重，再把权重应用到完整记录，并显示“ICA计算中”窗口；可在“预处理参数 → 人工复核”调整最大训练点数。
+
+流程与路径、坏段参数、信号步骤、自动伪迹、人工复核和运行日志页面均使用独立垂直滚动区，窗口缩小时不会截断下方参数。任务运行期间点击主界面的“关闭”或右上角关闭键，会先询问是否取消；确认后协作式停止当前任务并保留界面与已填写参数，不会直接关闭UI。
+
+多通道主界面底部的“打开操作说明”可直接打开`output/pdf/HyperEEG全流程操作说明.pdf`。V0.5.3同时修复了先预处理流程在最终分段时将`string`路径错误传入`dir`的问题，并兼容空的忽略名单路径；V0.5.4将原TXT重排为带可点击目录、PDF书签和重点提示框的正式操作手册。
 
 # 0 Prepare
 
@@ -55,6 +85,12 @@ data_ignore.xlsx文件格式如下：
 ## 1.3 手动选择数据列
 对有效数据进行逐一marker输入，在这一步中，会弹出弹窗（如果提示：无法对xxx数据进行.的处理方式等报错，请重启matlab，这是由于matlab缓冲导致的。）
 弹窗中，上方显示所有在实验中打出的marker的时间点以及所标记的类型，请根据你们的实验要求进行数据拆分。
+
+Marker界面同时显示`Sample index`和`Time (ms)`；Start、End统一填写`Time (ms)`，不能直接把样本索引当作毫秒使用。
+
+文件较多时可在`segment_pipeline`第5参数传入XLSX，跳过逐文件手工输入。XLSX每行表示一个区间，必需列为`file_name`、`segment_name`、`start`、`end`、`unit`。`unit`必须明确写`time_ms`、`time_s`或`sample_index`；同一文件、同一分段可以写多行。可选`enabled`列用于临时关闭某行。XLSX模式不会再按跨文件Marker数量离群值排除文件，但读取失败和忽略名单仍然生效。
+
+`+HyperEEG/+MultiCH/example`中提供`segment_plan_example.xlsx`和`data_ignore_example.xlsx`。忽略名单只在第一个工作表填写一列不带`.bdf`扩展名的基本文件名，不要增加备注列。
 点击添加片段按钮，在下方填入名称，开始时间，结束时间，其中名称可以在多个段之间重复，任意填写即可（为保证数据质量，尽量是英文和数字，理论上中文也可以）。
 结束时间必须大于开始时间，结束时间可以填写end标识到数据采集完毕。
 
@@ -63,13 +99,13 @@ data_ignore.xlsx文件格式如下：
 值得注意的是，如果有想要额外保存到BDF原始数据，请进入EEGdataSaver修正。
 
 # 2 坏段识别与去除
-总体流程请参见`Artifact_pipeline`。该流程只读取数据切分阶段产生的`_segment.mat`文件，先进行自动识别，再进行人工复核，最后统一排除坏段并保存。
+总体流程请参见`Artifact_pipeline`。该流程可读取原始连续BDF或数据切分阶段产生的`_segment.mat`，先进行自动识别，再进行人工复核，最后统一排除坏段并保存。
 
 ```matlab
 HyperEEG.MultiCH.pipeline.Artifact_pipeline(inputDir,outputDir)
 ```
 
-其中`inputDir`为`_segment.mat`文件所在目录，`outputDir`为处理结果目录。输出文件名称会从`_segment.mat`变为`_artifact.mat`。数据切分和坏段处理日志统一保存在当前工作目录的`log`文件夹，名称分别采用`时间_segment.txt`和`时间_artifact.txt`。
+其中`inputDir`可为BDF目录或`_segment.mat`目录，`outputDir`为处理结果目录。通过`autoOptions.inputType="bdf"|"segment"|"auto"`明确输入；BDF输出为`原名_artifact.mat`。数据切分和坏段处理日志统一保存在当前工作目录的`log`文件夹，名称分别采用`时间_segment.txt`和`时间_artifact.txt`。
 
 两个Pipeline默认开启日志。如需关闭，可在最后一个参数传入`"off"`：
 
@@ -112,7 +148,7 @@ EEGdata.artifact.manual
 自动或人工标记中的`channel = 0`表示全局坏时间段，Pipeline会从`EEGdata.times`和所有通道中删除对应时间列。`channel > 0`只将指定通道对应区间设为`NaN`，不会删除其它通道的数据，也不会破坏公共时间轴。其它已有字段保持不变，便于从输出结果追溯自动与人工标记。
 
 # 3 脑电预处理
-预处理流程读取坏段处理阶段产生的`_artifact.mat`文件，并输出`_clean.mat`文件。最小调用如下：
+预处理流程可读取BDF、`_segment.mat`或坏段阶段产生的`_artifact.mat`，并输出`_clean.mat`。统一UI会根据所选顺序自动指定输入类型；直接调用时可设置`options.inputType`。最小调用如下：
 
 ```matlab
 HyperEEG.MultiCH.pipeline.Preprocess_pipeline(inputDir,outputDir)

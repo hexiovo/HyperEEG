@@ -10,11 +10,21 @@ function segmentinfo = MarkerCheck_Manual(dataflag,markerList,savekey)
     end
 
     for i = 1:nfiles
+        HyperEEG.MultiCH.misc.WorkflowCancel("throw");
         if dataflag(i) ~=0
             
             %赋值
             currentmarker.type = {markerList{i}.marker.type};
-            currentmarker.latency = {markerList{i}.marker.latency};
+            currentmarker.sample_index = {markerList{i}.marker.latency};
+
+            if ~isempty(markerList{i}.marker) && ...
+                    isfield(markerList{i}.marker, 'time_ms')
+                currentmarker.time_ms = {markerList{i}.marker.time_ms};
+            else
+                currentmarker.time_ms = currentmarker.sample_index;
+                warning("Marker缺少time_ms，界面暂用原位置值：%s", ...
+                    markerList{i}.filename);
+            end
 
             currentfile = markerList{i}.filename;
             [~, name, ext] = fileparts(currentfile);
@@ -25,6 +35,7 @@ function segmentinfo = MarkerCheck_Manual(dataflag,markerList,savekey)
 
             %返回对应列
             [segmentindex,emptybool] = HyperEEG.MultiCH.main.MarkerSegmentEditor(currentmarker,currentfilename);
+            HyperEEG.MultiCH.misc.WorkflowCancel("throw");
 
             if emptybool == 1
 

@@ -71,6 +71,7 @@ function [rejectComponents, cancelbool] = ICAComponentEditor( ...
     end
 
     cumulativeBreak = [0, cumsum(breakAfterSample)];
+    drawnow;
     refreshComponent();
     confirmControl.Enable = 'on';
     drawnow;
@@ -139,6 +140,17 @@ function [rejectComponents, cancelbool] = ICAComponentEditor( ...
     end
 
     function plotSpectrum(componentData)
+        % 仅用居中的代表性连续窗口绘制预览PSD，避免数百万点长记录
+        % 在每次切换成分时阻塞界面；ICA估计和重建仍使用完整激活。
+        maxSpectrumPoint = 200000;
+
+        if numel(componentData) > maxSpectrumPoint
+            firstPoint = floor((numel(componentData) - ...
+                maxSpectrumPoint) / 2) + 1;
+            componentData = componentData( ...
+                firstPoint:firstPoint + maxSpectrumPoint - 1);
+        end
+
         if exist('pwelch', 'file') == 2
             windowLength = max(32, round(2 * icaModel.sampleRate));
             windowLength = min(windowLength, numel(componentData));

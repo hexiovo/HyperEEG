@@ -1,7 +1,7 @@
 function [outmarker , emptybool] = MarkerSegmentEditor(markerdata,currentfilename)
 %MARKERSEGMENTEDITOR 显示Marker并收集实验片段名称与边界。
-%   markerdata包含type和latency；End可填写数字或end。关闭/取消通过
-%   emptybool与正常确认区分。输入边界必须与后续EEG.times单位一致。
+%   markerdata包含type、sample_index和time_ms；Start/End统一填写time_ms，
+%   End也可填写end。关闭/取消通过emptybool与正常确认区分。
     
     
     outmarker = [];
@@ -12,7 +12,9 @@ function [outmarker , emptybool] = MarkerSegmentEditor(markerdata,currentfilenam
     %% =========================
     titletxt = char(currentfilename+'  mark剪辑窗口');
     fig = uifigure('Name',titletxt, ...
-        'Position',[300 100 800 600]);
+        'Position',[300 100 800 600], ...
+        'Tag', 'HyperEEGMarkerSegmentEditor', ...
+        'CloseRequestFcn', @(~, ~) closeAndReturn([]));
 
     mainLayout = uigridlayout(fig,[3 1]);
     mainLayout.RowHeight = {'2x','3x',40};
@@ -24,9 +26,11 @@ function [outmarker , emptybool] = MarkerSegmentEditor(markerdata,currentfilenam
     topScroll = uigridlayout(topPanel,[1 1]);
     
     txt = "";
+    txt = "Type\tSample index\tTime (ms)" + newline;
     for i = 1:length(markerdata.type)
-        txt = txt + sprintf('%s\t%d\n', ...
-            string(markerdata.type{i}), markerdata.latency{i});
+        txt = txt + sprintf('%s\t%.6g\t%.6f\n', ...
+            string(markerdata.type{i}), markerdata.sample_index{i}, ...
+            markerdata.time_ms{i});
     end
     
     ta = uitextarea(topScroll, ...
@@ -78,8 +82,8 @@ function [outmarker , emptybool] = MarkerSegmentEditor(markerdata,currentfilenam
         segLayout.RowHeight = [segLayout.RowHeight, {30}];
     
         nameBox  = uieditfield(segLayout,'text','Placeholder','Name');
-        startBox = uieditfield(segLayout,'text','Placeholder','Start(数字)');
-        endBox   = uieditfield(segLayout,'text','Placeholder','End(数字或END)');
+        startBox = uieditfield(segLayout,'text','Placeholder','Start (time_ms)');
+        endBox   = uieditfield(segLayout,'text','Placeholder','End (time_ms或END)');
     
         nameBox.Layout.Row = r;
         nameBox.Layout.Column = 1;
@@ -205,7 +209,7 @@ function [outmarker , emptybool] = MarkerSegmentEditor(markerdata,currentfilenam
         
             outmarker = segs;
         
-            close(fig);
+            delete(fig);
         end
     
     %% =========================
@@ -215,7 +219,9 @@ function [outmarker , emptybool] = MarkerSegmentEditor(markerdata,currentfilenam
             % 统一返回确认结果或取消状态，并释放UI窗口。
             outmarker = val;
             emptybool = 1;
-            close(fig);
+            if isvalid(fig)
+                delete(fig);
+            end
         end
     
     %% 等待窗口关闭

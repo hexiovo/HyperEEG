@@ -1,6 +1,6 @@
 function outputFiles = Preprocess_pipeline( ...
         inputDir, outputDir, options, logSwitch)
-%PREPROCESS_PIPELINE 批量完成_artifact.mat到_clean.mat的预处理。
+%PREPROCESS_PIPELINE 批量完成BDF或项目MAT到_clean.mat的预处理。
 %   执行顺序为重采样、去趋势、带通、Notch、可选重参考、自动伪迹、
 %   人工ICA成分选择、最终通道频域复核。参数和结果写入处理历史。
 %   outputFiles只返回成功保存的文件；单文件异常会记录warning后继续。
@@ -38,24 +38,26 @@ function outputFiles = Preprocess_pipeline( ...
 
     inputDir = string(inputDir);
     outputDir = string(outputDir);
-    files = HyperEEG.MultiCH.misc.getFiles(inputDir, 'mat');
-    % 严格限制阶段输入，防止重复处理_clean.mat或误读其它MAT文件。
-    artifactFiles = files(endsWith( ...
-        files, "_artifact.mat", "IgnoreCase", true));
+    [inputFiles, inputTypes] = collectInputFiles(inputDir, options.inputType);
+    [inputFiles, inputTypes] = applyExplicitFileFilter( ...
+        inputFiles, inputTypes, options.inputFiles);
     outputFiles = strings(0, 1);
     excludedFileCount = 0;
 
-    if isempty(artifactFiles)
-        warning("inputDir中未找到任何_artifact.mat文件：%s", inputDir);
+    if isempty(inputFiles)
+        warning("inputDir中未找到符合inputType=%s的BDF或项目MAT：%s", ...
+            options.inputType, inputDir);
         return;
     end
 
-    nfile = numel(artifactFiles);
+    nfile = numel(inputFiles);
     fprintf('[%s]', datestr(now, 'yyyy-mm-dd HH:MM:SS'));
     fprintf("发现 %d 个待预处理文件\n", nfile);
 
     for ifile = 1:nfile
-        filepath = artifactFiles(ifile);
+        HyperEEG.MultiCH.misc.WorkflowCancel("throw");
+        filepath = inputFiles(ifile);
+        inputType = inputTypes(ifile);
         [~, inputName, inputExt] = fileparts(filepath);
         currentfilename = string(inputName) + string(inputExt);
 
@@ -66,22 +68,16 @@ function outputFiles = Preprocess_pipeline( ...
 
         % 单文件读取失败不终止整批任务。
         try
-            loadedData = load(char(filepath));
+            EEGdata = loadInputEEGdata(filepath, inputType);
         catch ME
-            warning("读取MAT文件失败：%s\n%s", filepath, ME.message);
+            warning("读取预处理输入失败：%s\n%s", filepath, ME.message);
             continue;
         end
-
-        if ~isfield(loadedData, "EEGdata")
-            warning("MAT文件中不存在变量EEGdata：%s", filepath);
-            continue;
-        end
-
-        EEGdata = loadedData.EEGdata;
 
         % 一个文件的任一步失败时不保存半成品，继续处理下一文件。
         try
             validateEEGdata(EEGdata);
+            HyperEEG.MultiCH.misc.WorkflowCancel("throw");
             sourceRate = ...
                 HyperEEG.MultiCH.core.PreprocessSampleRate(EEGdata);
             EEGdata = initializePreprocessing( ...
@@ -186,6 +182,7 @@ function outputFiles = Preprocess_pipeline( ...
             skipCurrentFile = false;
 
             while true
+                HyperEEG.MultiCH.misc.WorkflowCancel("throw");
                 reviewRound = reviewRound + 1;
 
                 if options.artifact.enabled && ...
@@ -316,6 +313,10 @@ function outputFiles = Preprocess_pipeline( ...
                 continue;
             end
         catch ME
+            if strcmp(ME.identifier, 'HyperEEG:UserCancelled')
+                rethrow(ME);
+            end
+
             warning("预处理失败：%s\n%s", filepath, ...
                 getReport(ME, 'extended', 'hyperlinks', 'off'));
             continue;
@@ -335,6 +336,7 @@ function outputFiles = Preprocess_pipeline( ...
         end
 
         EEGdata.file.cleanpath = outputPath;
+        HyperEEG.MultiCH.misc.WorkflowCancel("throw");
 
         % 只有全部启用步骤成功完成后才写入_clean.mat。
         try
@@ -359,6 +361,81 @@ function outputFiles = Preprocess_pipeline( ...
 
 end
 
+
+function [inputFiles, inputTypes] = applyExplicitFileFilter( ...
+        inputFiles, inputTypes, explicitFiles)
+%APPLYEXPLICITFILEFILTER 只处理本次上游实际生成的文件，避免读取旧结果。
+
+    explicitFiles = string(explicitFiles(:));
+
+    if isempty(explicitFiles)
+        return;
+    end
+
+    normalizedInput = lower(replace(string(inputFiles), '/', '\'));
+    normalizedExplicit = lower(replace(explicitFiles, '/', '\'));
+    keep = ismember(normalizedInput, normalizedExplicit);
+    inputFiles = inputFiles(keep);
+    inputTypes = inputTypes(keep);
+
+end
+
+function [inputFiles, inputTypes] = collectInputFiles(inputDir, inputType)
+%COLLECTINPUTFILES 选择最高可用阶段，避免同一记录被重复预处理。
+
+    matFiles = HyperEEG.MultiCH.misc.getFiles(inputDir, 'mat');
+    artifactFiles = matFiles(endsWith( ...
+        matFiles, "_artifact.mat", "IgnoreCase", true));
+    segmentFiles = matFiles(endsWith( ...
+        matFiles, "_segment.mat", "IgnoreCase", true));
+    bdfFiles = HyperEEG.MultiCH.misc.getFiles(inputDir, 'bdf');
+    inputType = lower(string(inputType));
+
+    switch inputType
+        case "artifact"
+            inputFiles = artifactFiles;
+            inputTypes = repmat("artifact", numel(inputFiles), 1);
+        case "segment"
+            inputFiles = segmentFiles;
+            inputTypes = repmat("segment", numel(inputFiles), 1);
+        case "bdf"
+            inputFiles = bdfFiles;
+            inputTypes = repmat("bdf", numel(inputFiles), 1);
+        otherwise
+            if ~isempty(artifactFiles)
+                inputFiles = artifactFiles;
+                inputTypes = repmat("artifact", numel(inputFiles), 1);
+            elseif ~isempty(segmentFiles)
+                inputFiles = segmentFiles;
+                inputTypes = repmat("segment", numel(inputFiles), 1);
+            else
+                inputFiles = bdfFiles;
+                inputTypes = repmat("bdf", numel(inputFiles), 1);
+            end
+    end
+
+end
+
+
+function EEGdata = loadInputEEGdata(filepath, inputType)
+%LOADINPUTEEGDATA 统一读取BDF和项目EEGdata MAT。
+
+    if inputType == "bdf"
+        EEGdata = HyperEEG.MultiCH.core.EEGdataFromBDF(filepath);
+        return;
+    end
+
+    loadedData = load(char(filepath));
+
+    if ~isfield(loadedData, "EEGdata")
+        error("MAT文件中不存在变量EEGdata：%s", filepath);
+    end
+
+    EEGdata = loadedData.EEGdata;
+
+end
+
+
 function outputText = componentText(componentIndex)
 %COMPONENTTEXT 将成分序号格式化为适合日志的一行文本。
 
@@ -374,7 +451,7 @@ function outputPath = buildCleanOutputPath(outputDir, inputName)
 %BUILDCLEANOUTPUTPATH 保持主体名称不变，仅替换阶段后缀。
 
     outputName = regexprep(inputName, ...
-        '_artifact$', '', 'ignorecase') + "_clean.mat";
+        '_(artifact|segment)$', '', 'ignorecase') + "_clean.mat";
     outputPath = fullfile(outputDir, outputName);
 
 end
@@ -384,9 +461,13 @@ function [EEGdata, info] = runStep( ...
 %RUNSTEP 统一打印步骤日志，并在成功后追加处理历史。
 
     inputSampleCount = size(EEGdata.data, 2);
+    drawnow limitrate;
+    HyperEEG.MultiCH.misc.WorkflowCancel("throw");
     fprintf('[%s]', datestr(now, 'yyyy-mm-dd HH:MM:SS'));
     fprintf("开始%s\n", stepName);
     [EEGdata, info] = stepFunction();
+    drawnow limitrate;
+    HyperEEG.MultiCH.misc.WorkflowCancel("throw");
     EEGdata = appendHistory( ...
         EEGdata, stepName, parameters, info, inputSampleCount);
     fprintf("完成%s\n", stepName);

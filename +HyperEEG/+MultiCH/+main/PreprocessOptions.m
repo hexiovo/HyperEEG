@@ -8,6 +8,8 @@ function options = PreprocessOptions(options)
     end
 
     %% 各步骤默认参数：优先保留低通道数据，不默认进行激进处理
+    defaults.inputType = "auto";
+    defaults.inputFiles = strings(0, 1);
     defaults.resample.enabled = false;
     defaults.resample.targetRate = 250;
 
@@ -37,9 +39,11 @@ function options = PreprocessOptions(options)
     defaults.artifact.auto.icaHighFrequencyZ = 6;
     defaults.artifact.auto.icaMaxRejectFraction = 0.25;
     defaults.artifact.auto.icaRejectComponents = [];
+    defaults.artifact.auto.icaMaxTrainingSamples = 100000;
     defaults.artifact.auto.asrBurstCriterion = 20;
     defaults.artifact.auto.asrMaxMemoryMB = 512;
     defaults.artifact.icaManual.enabled = true;
+    defaults.artifact.icaManual.maxTrainingSamples = 100000;
     defaults.artifact.manual.enabled = true;
 
     % 先迁移旧字段再递归合并，确保旧脚本仍能获得新结构。
@@ -52,6 +56,16 @@ end
 
 function validateOptions(options)
 %VALIDATEOPTIONS 在读取文件前集中检查配置，避免批处理中途才失败。
+
+    if ~any(strcmpi(string(options.inputType), ...
+            ["auto", "bdf", "artifact", "segment"]))
+        error("inputType必须为auto、bdf、artifact或segment。");
+    end
+
+    if ~(ischar(options.inputFiles) || isstring(options.inputFiles) || ...
+            iscellstr(options.inputFiles)) %#ok<ISCLSTR>
+        error("inputFiles必须为空或文本路径数组。");
+    end
 
     textOptions = {options.detrend.method, ...
         options.bandpass.profile, options.reference.method};
@@ -155,6 +169,8 @@ function validateOptions(options)
     validateattributes(options.artifact.auto.icaHighFrequencyZ, ...
         {'numeric'}, ...
         {'scalar', 'real', 'finite', 'positive'});
+    validateattributes(options.artifact.auto.icaMaxTrainingSamples, ...
+        {'numeric'}, {'scalar', 'integer', '>=', 1000});
 
     if ~isempty(options.artifact.auto.icaRejectComponents)
         validateattributes(options.artifact.auto.icaRejectComponents, ...
@@ -167,6 +183,8 @@ function validateOptions(options)
     validateattributes(options.artifact.auto.asrMaxMemoryMB, ...
         {'numeric'}, ...
         {'scalar', 'real', 'finite', 'positive'});
+    validateattributes(options.artifact.icaManual.maxTrainingSamples, ...
+        {'numeric'}, {'scalar', 'integer', '>=', 1000});
 
 end
 
@@ -220,6 +238,7 @@ function options = migrateArtifactOptions(options)
     legacyFields = ["robustZ", "robustWindow_s", ...
         "icaKurtosisZ", "icaHighFrequencyZ", ...
         "icaMaxRejectFraction", "icaRejectComponents", ...
+        "icaMaxTrainingSamples", ...
         "asrBurstCriterion", "asrMaxMemoryMB"];
 
     for ifield = 1:numel(legacyFields)
