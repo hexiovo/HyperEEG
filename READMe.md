@@ -5,7 +5,7 @@ authority：[hexi](https://github.com/hexiovo)
 
 email：[彭洋](mailto:py_edu_mail@163.com)
 
-完整的逐步运行方法、人工界面判断准则和输出验收清单见`txt/HyperEEG全流程操作说明.pdf`；PDF提供可点击目录、书签和实际操作界面截图。
+完整的逐步运行方法、人工界面判断准则、个体水平统计步骤和输出验收清单见`txt/HyperEEG全流程操作说明.pdf`；PDF提供可点击目录、书签和实际操作界面截图。
 
 # 统一工作流界面
 
@@ -27,7 +27,7 @@ app = HyperEEG.MultiCH.pipeline.WorkflowUI();
 
 - `运行：先分段`：BDF → `_segment.mat` → `_artifact.mat` → `_clean.mat`，兼容原流程，但每个片段可能分别进行人工ICA；
 - `运行：先预处理`：连续BDF → `_artifact.mat` → `_clean.mat` → 最终`_clean_segment.mat`。ICA在每份长连续记录上执行一次，再按Marker计划切段，通常更适合当前问题；
-- `统计分析（待开发）`：已预留并禁用，当前版本不会执行未定义的统计方法。
+- `统计分析`：打开独立统计控制台；当前实现个体水平的时域、频谱/频带和熵/非线性指标（参考说明5.1–5.3）。
 
 原始BDF始终只读，各阶段必须使用不同输出目录。可继续传入示例中的`segment_plan_example.xlsx`与`data_ignore_example.xlsx`。
 
@@ -35,7 +35,41 @@ app = HyperEEG.MultiCH.pipeline.WorkflowUI();
 
 流程与路径、坏段参数、信号步骤、自动伪迹、人工复核和运行日志页面均使用独立垂直滚动区，窗口缩小时不会截断下方参数。任务运行期间点击主界面的“关闭”或右上角关闭键，会先询问是否取消；确认后协作式停止当前任务并保留界面与已填写参数，不会直接关闭UI。
 
-多通道主界面底部的“打开操作说明”可直接打开`txt/HyperEEG全流程操作说明.pdf`。V0.5.3同时修复了先预处理流程在最终分段时将`string`路径错误传入`dir`的问题，并兼容空的忽略名单路径；V0.5.4将原TXT重排为正式PDF手册；V0.5.5补充实际操作界面截图，并统一Marker整数显示。
+多通道主界面底部的“打开操作说明”可直接打开`txt/HyperEEG全流程操作说明.pdf`。统计控制台底部的“打开指标说明”打开简明总览`txt/HyperEEG统计分析指标说明.pdf`；5.1、5.2、5.3页面分别打开对应的详细指标说明。
+
+# 个体水平统计分析
+
+从主工作流点击“统计分析”，或直接运行：
+
+```matlab
+app = HyperEEG.MultiCH.pipeline.StatisticsUI();
+```
+
+当前支持三个可单独或同时启用的个体水平方法。5.1“时域统计”中的均值、中位数、最小/最大、极差/峰峰值、方差、标准差、MAD、IQR、RMS、偏度、峰度、平均绝对差、线长、零交叉率及Hjorth参数均可逐项启用；另补充分位数、截尾均值、变异系数、能量和绝对值和。
+
+“输入与总体控制”页只保留clean_data路径、存储路径、分组表、统计表格总开关、计算版块和通用缺失值策略。PSD、周期峰、5.1表格、5.3标量/序列以及RQA矩阵的导出方式均放在对应指标页面，不混入总体控制。
+
+5.1计算与XLSX导出已经解耦。可选择分位数的linear/nearest/lower/higher/midpoint算法、MAD使用中位或均值绝对偏差、偏度/峰度使用原矩估计或有限样本偏差校正、零交叉相对mean/median/zero。XLSX可选`wide`、`long`、`both`或`none`；选择`none`时仍计算并完整保存MAT。
+
+5.2“频谱与频带”支持完整Welch PSD、绝对/相对/对数频带功率、总功率、峰频与峰功率、频谱质心、中位频率、带宽、非周期1/f指数/截距/拟合优度、周期峰列表、三类预注册比值和FAA。常用补充包括谱边缘频率SEF90/95、个体Alpha峰和频谱平坦度；Delta/Theta/Alpha/Beta/Gamma及自定义频带、Welch参数、拟合范围、排除频段、峰阈值、FAA电极对/符号/对数方式均可配置。
+
+5.3“熵与非线性动力学”包含频谱熵、差分熵、样本熵、近似熵、排列熵、Lempel-Ziv、Hurst、DFA、Higuchi/Petrosian/Katz分形维数及完整RQA标量；常用补充包括模糊熵、SVD熵、多尺度样本熵、相关维数和最大Lyapunov指数。相关维数和Lyapunov标为探索性且默认关闭。总控制统一支持按指标忽略、线性/最近邻/前值插值、填零、超过阈值拒绝通道或拒绝文件，并始终导出有效样本数和缺失率。
+
+5.3新增频谱熵`welch/periodogram`、模板熵`zscore/demean/none`和`chebyshev/euclidean`、差分熵`gaussian/histogram`、RQA`euclidean/chebyshev`算法选择。标量XLSX可选宽表、长表、两者或不导出；DFA/MSE/相关维数/Lyapunov序列可选长表、宽表、独立工作簿或不导出。RQA递归矩阵可选择递归点坐标，或按通道拆成独立0/1稠密矩阵工作簿。
+
+输入为包含`EEGdata`的clean MAT目录，输出为：
+
+- 仅5.1、5.2、5.3时分别为`_time_domain_statistics.mat`、`_frequency_statistics.mat`、`_entropy_nonlinear_statistics.mat`；启用多个版块时为`_statistics.mat`，变量名均为`Results`；
+- 频谱标量直接写入`FrequencyScalar`，FAA写入`FrequencyPairs`；完整PSD与周期峰在MAT中始终保留；
+- XLSX统计表格可整体关闭。完整PSD在“PSD与Welch”中独立选择`long`、`wide`、`separate`或`none`，并设置频点步长；周期峰在“1/f与周期峰”中另行选择`long`、`wide`、`separate`或`none`。两者互不绑定，且都不改变MAT；
+- 时域及非线性标量直接写入`Results/TimeDomain`或`NonlinearScalar`宽表；
+- 5.1标量可导出`TimeDomainWide/TimeDomainLong`；5.3标量可导出`NonlinearScalarWide/NonlinearScalarLong`，单一默认布局保留兼容名称；
+- DFA、多尺度熵、相关维数和Lyapunov曲线可写`NonlinearSeries`长表、按索引展开宽表或独立工作簿；
+- RQA完整递归矩阵默认保存在MAT；显式启用后可导出递归点坐标，或生成带`RQA_Index`索引页的独立稠密矩阵工作簿；`Settings`记录算法、布局和批次信息。
+
+统计界面的5.1、5.2和5.3页面可分别直接打开`txt/HyperEEG个体水平时域统计指标说明.pdf`、`txt/HyperEEG频谱与频带指标说明.pdf`和`txt/HyperEEG熵与非线性指标说明.pdf`。底部`txt/HyperEEG统计分析指标说明.pdf`保留原名称，作为全部个体水平指标与详细PDF入口的简明目录。
+
+多人汇总统计时可选择分组XLSX。示例位于`+HyperEEG/+MultiCH/example/statistics_group_example.xlsx`，支持`file_name`、`subject_id`、`group`、`dyad_id`、`session`、`condition`和`enabled`字段。最终汇总文件统一称为“统计表格”。
 
 # 0 Prepare
 

@@ -7,18 +7,21 @@ app = HyperEEG()
 ```
 类似`eeglab`的项目入口。显示单通道和多通道选项；单通道入口当前禁用并标记待开发，多通道进入`HyperEEG.MultiCH.pipeline.WorkflowUI`。
 
-无输出调用`HyperEEG`会打印名称、V0.5.5版本、版权、依赖环境和注意事项，不产生`ans`；显式调用`app = HyperEEG()`仍返回UI句柄和控件结构，便于脚本或测试控制。
+无输出调用`HyperEEG`会打印名称、V0.9.1版本、版权、依赖环境和注意事项，不产生`ans`；显式调用`app = HyperEEG()`仍返回UI句柄和控件结构，便于脚本或测试控制。
 
 ## Content
 - [Pipeline](#Pipeline)
   - [WorkflowUI](#WorkflowUI)
   - [Workflow_pipeline](#Workflow_pipeline)
+  - [StatisticsUI](#StatisticsUI)
+  - [Statistics_pipeline](#Statistics_pipeline)
   - [segment_pipeline](#segment_pipeline)
   - [Artifact_pipeline](#Artifact_pipeline)
   - [Preprocess_pipeline](#Preprocess_pipeline)
 
 - [Main](#Main)
   - [WorkflowOptions](#WorkflowOptions)
+  - [StatisticsOptions](#StatisticsOptions)
   - [ArtifactOptions](#ArtifactOptions)
   - [segment_EEGdata](#segment_EEGdata)
   - [MarkerExtract](#MarkerExtract)
@@ -45,6 +48,9 @@ app = HyperEEG()
   - [ArtifactDetectByWindow](#ArtifactDetectByWindow)
   - [Preprocess core functions](#Preprocess-core-functions)
   - [PreprocessChannelSpectrum](#PreprocessChannelSpectrum)
+  - [TimeDomainStatistics](#TimeDomainStatistics)
+  - [FrequencyStatistics](#FrequencyStatistics)
+  - [NonlinearStatistics](#NonlinearStatistics)
 - [misc](#Misc)
   - [getFiles](#getFiles)
   - [Segmentmerge](#Segmentmerge)
@@ -61,7 +67,7 @@ app = HyperEEG()
 ```matlab
 app = HyperEEG.MultiCH.pipeline.WorkflowUI()
 ```
-打开统一工作流界面。四个页签分别配置流程与路径、坏段全部参数、预处理全部参数和运行日志。底部“运行：先分段”和“运行：先预处理”是两个独立入口；“统计分析（待开发）”为禁用占位按钮。测试或嵌入调用可传入`'Visible','off'`。
+打开统一工作流界面。四个页签分别配置流程与路径、坏段全部参数、预处理全部参数和运行日志。底部“运行：先分段”和“运行：先预处理”是两个处理入口；“统计分析”打开独立统计控制台。测试或嵌入调用可传入`'Visible','off'`。
 
 各配置页使用MATLAB R2023a原生可滚动的`uigridlayout`，按固定行高完整呈现参数并随窗口宽度伸缩。运行中点击关闭会弹出取消确认；确认后通过`WorkflowCancel`向各Pipeline发送协作式取消请求，关闭当前人工复核窗口并保留主UI。
 
@@ -72,6 +78,18 @@ app = HyperEEG.MultiCH.pipeline.WorkflowUI()
 results = Workflow_pipeline(config,order,progressCallback)
 ```
 不依赖UI的工作流编排入口。`order`取`"segment_first"`或`"preprocess_first"`。前者兼容原顺序；后者先在连续BDF上执行坏段和预处理，再调用`segment_EEGdata`切割清洗后的连续MAT，从而避免每个小段重复人工ICA。`config`由`WorkflowOptions`补齐和验证，第三参数可选，用于接收阶段进度文本。
+
+### StatisticsUI
+```matlab
+app = HyperEEG.MultiCH.pipeline.StatisticsUI()
+```
+打开独立统计控制台。当前包括输入与总体控制、5.1时域、5.2频谱与频带、5.3熵与非线性和运行日志。总体页只保存跨版块配置；专属导出选项放在对应指标页。5.1支持wide/long/both/none；5.2的PSD与周期峰分别支持long/wide/separate/none；5.3标量支持wide/long/both/none，序列支持long/wide/separate/none，RQA矩阵支持坐标或独立稠密矩阵工作簿。MAT始终保存完整计算结果。
+
+### Statistics_pipeline
+```matlab
+summary = HyperEEG.MultiCH.pipeline.Statistics_pipeline(options,progressCallback)
+```
+递归读取clean MAT目录，对每个`EEGdata.data`计算所选时域、频谱/频带及熵/非线性特征。仅5.1、5.2、5.3分别保存为`_time_domain_statistics.mat`、`_frequency_statistics.mat`、`_entropy_nonlinear_statistics.mat`；多版块联合运行保存为`_statistics.mat`。各版块统计表格可独立选择布局或不导出；5.2的PSD和周期峰采用互相独立的布局；RQA可输出坐标或独立稠密矩阵。所有布局只改变XLSX，不改变MAT。可选分组表通过`file_name`匹配并附加被试、组别、多人单元、批次和条件字段；单文件失败不会中止其它文件。
 
 ### segment_pipeline
 ```matlab
@@ -132,6 +150,9 @@ outputFiles = Preprocess_pipeline(inputDir,outputDir,options,logSwitch)
 
 ### WorkflowOptions
 递归补齐统一UI和`Workflow_pipeline`配置，验证阶段开关、日志开关，并分别调用`ArtifactOptions`和`PreprocessOptions`完成子配置校验。
+
+### StatisticsOptions
+补齐并验证统计路径、XLSX名称、指标集合、分位点、归一化和缺失处理策略。启用时域方法后至少选择一个指标；非法路径名称、阈值或参数会在读取数据前报错。
 
 ### ArtifactOptions
 集中定义`Artifact_pipeline`的输入类型、自动/人工/应用三个开关及全部滑窗坏段检测参数；错误参数会在批处理读取文件前终止。
@@ -351,6 +372,26 @@ blocks = PreprocessContinuousBlocks(timeValues)
     data,timeValues,sampleRate)
 ```
 计算最终复核所需的通道×频率PSD。输出`powerDb`尺寸为通道数×频率点数，`frequencyHz`单位Hz；存在已删除时间段时按连续块分别估计并按有效样本数加权，不跨时间缺口计算频谱。
+
+### TimeDomainStatistics
+```matlab
+[resultTable,info] = TimeDomainStatistics(data,sampleRate,options)
+```
+与文件读写无关的个体水平时域统计核心。输入为通道×样本矩阵；输出每行一个通道，并包含总样本数、有效样本数、缺失率、处理状态和所选指标。分位数支持五种插值方式，MAD支持中位/均值绝对偏差，偏度/峰度支持偏差校正，零交叉可相对均值、中位数或零。实现不依赖Statistics and Machine Learning Toolbox。
+
+### FrequencyStatistics
+```matlab
+[scalarTable,spectrumTable,peakTable,pairTable,details,info] = ...
+    FrequencyStatistics(data,sampleRate,options,channelNames)
+```
+与文件读写无关的5.2核心。`scalarTable`每行一个通道，保存总功率、各频带绝对/相对/对数功率、谱形、SEF、IAF、频谱平坦度、非周期参数和所选比值；`spectrumTable`逐频点保存`frequency_hz/power/power_db_hz`；`peakTable`逐峰保存中心频率、相对1/f的log10超额与半高带宽；`pairTable`按左右电极对保存FAA及符号方向。`details`始终保留完整PSD、Welch实际参数、频带定义、1/f拟合曲线和周期峰；PSD与周期峰在统计表格中的布局分别设置，频点步长仅作用于PSD。
+
+### NonlinearStatistics
+```matlab
+[scalarTable,seriesTable,details,info] = ...
+    NonlinearStatistics(data,sampleRate,options)
+```
+与文件读写无关的5.3核心。`scalarTable`每行一个通道；`seriesTable`保存全部尺度、半径、延迟及可选RQA坐标；`details`保留实际计算点数、算法参数和递归矩阵。频谱熵支持Welch/Periodogram，差分熵支持Gaussian/Histogram，模板熵支持三种标准化与两种距离，RQA支持Euclidean/Chebyshev距离。流水线再将标量和序列转换为所选宽表、长表或独立工作簿。
 
 
 
